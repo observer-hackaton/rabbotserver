@@ -38,10 +38,10 @@ controller.hears(['create (.*) (.*)'], 'direct_message,direct_mention,mention', 
     }
   });
 
-  create_monitor(type, host)
+  create_monitor(type, host, message)
 });
 
-function create_monitor(type, host){
+function create_monitor(type, host, message){
   var options = {
     host: process.env.RABBIT_MQ_SERVER,
     path: '/monitor',
@@ -57,29 +57,34 @@ function create_monitor(type, host){
       response.on('end', function () {
         console.log(str);
         bot.botkit.log('response:', str);
-      });
-    }
-
-    var monitor = { monitor : { check : { type : type, interval : 60, arguments: "{ \"host\" : \"" + host + "\" }" }, notifier : { type : "slack", arguments : "{ \"webhook_url\" : \"https:\/\/hooks.slack.com\/services\/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\" }" } } };
-    bot.botkit.log('response:', JSON.stringify(monitor));
-
-    var req = http.request(options, callback);
-    //This is the data we are posting, it needs to be a string or a buffer
-    req.write(JSON.stringify(monitor));
-    req.end();
-  }
-
-  function start_connection() {
-    amqp.connect('amqp://' + process.env.RABBIT_MQ_SERVER, function(err, conn) {
-      conn.createChannel(function(err, ch) {
-        var exch = 'checks'
-        var q = type;
-        var msg = 'Hello World!';
-
-        ch.assertQueue(q, {durable: false});
-        ch.sendToQueue(q, new Buffer(msg));
-        console.log(" [x] Sent %s", msg);
-      });
-      setTimeout(function() { conn.close(); process.exit(0) }, 500);
+        bot.say({
+          text: str,
+          channel: message.channel // a valid slack channel, group, mpim, or im ID
+        }
+      );
     });
   }
+
+  var monitor = { monitor : { check : { type : type, interval : 60, arguments: "{ \"host\" : \"" + host + "\" }" }, notifier : { type : "slack", arguments : "{ \"webhook_url\" : \"https:\/\/hooks.slack.com\/services\/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\" }" } } };
+  bot.botkit.log('response:', JSON.stringify(monitor));
+
+  var req = http.request(options, callback);
+  //This is the data we are posting, it needs to be a string or a buffer
+  req.write(JSON.stringify(monitor));
+  req.end();
+}
+
+function start_connection() {
+  amqp.connect('amqp://' + process.env.RABBIT_MQ_SERVER, function(err, conn) {
+    conn.createChannel(function(err, ch) {
+      var exch = 'checks'
+      var q = type;
+      var msg = 'Hello World!';
+
+      ch.assertQueue(q, {durable: false});
+      ch.sendToQueue(q, new Buffer(msg));
+      console.log(" [x] Sent %s", msg);
+    });
+    setTimeout(function() { conn.close(); process.exit(0) }, 500);
+  });
+}
